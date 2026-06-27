@@ -1,0 +1,22 @@
+Five In Row authors and contributors
+====================================
+
+Local project
+-------------
+
+The original 5inRow C engine and repository-specific integration work belong to
+this repository's contributors.
+
+Rapfi upstream
+--------------
+
+This branch includes V6 source code under engine/v6-core, imported from
+https://github.com/dhbloo/rapfi.git.
+
+Upstream authors and acknowledgements are preserved at:
+
+- engine/v6-core/upstream/AUTHORS.upstream
+
+The upstream AUTHORS file credits Haobin Duan (dblue), HZY (sigmoid), Joker2770,
+crsov, nguyencongminh090, subarashikihibi, Stockfish authors, and the Pikafish
+team/contributors named there.

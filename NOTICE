@@ -1,0 +1,29 @@
+Five In Row / codex-lab NOTICE
+==============================
+
+This repository contains two engine lines during the codex/lab transition:
+
+- The original 5inRow C engine, kept as the legacy teaching and regression
+  baseline.
+- Rapfi-derived professional Gomoku/Renju engine source code imported under
+  engine/v6-core from https://github.com/dhbloo/rapfi.git.
+
+Rapfi import record
+-------------------
+
+- Upstream repository: https://github.com/dhbloo/rapfi.git
+- Imported tag/release: 250615
+- Imported commit: 1be1551ced57e38d53ed58f6d74bf6f8b4bdc230
+- Imported subtree: upstream engine copied into engine/v6-core/
+- Import date: 2026-06-20
+
+Licensing
+---------
+
+Rapfi source files state GPL version 3 or later. This repository includes a
+copy of the GNU GPL version 3 in COPYING. Any distribution containing the
+Rapfi-derived engine must satisfy the GPL source and attribution requirements.
+
+No binary release, WASM deployment, or bundled network-weight release should be
+published from codex/lab until docs/licenses.md and networks/manifest.json are
+complete for the exact shipped artifacts.

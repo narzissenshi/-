@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 创造性说明：本网页为五子棋对战网页，采用了计分制的minimax和机器学习式的神经网络两种机器模型，其中neutral network可以从已有模型开始迭代，也可以学习用户的下棋风格并进行蒸馏优化。 -->
+    <title>gomoku lab</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css?v=easy-train-23">
+    <script defer src="presearch-data.js?v=easy-train-23"></script>
+    <script defer src="gomoku-rules.js?v=easy-train-23"></script>
+    <script defer src="v6-engine-client.js?v=easy-train-23"></script>
+    <script defer src="script.js?v=easy-train-23"></script>
+    <script defer src="model-store.js?v=easy-train-23"></script>
+    <script defer src="trainer.js?v=easy-train-23"></script>
+    <script defer src="minimax-lab.js?v=easy-train-23"></script>
+  </head>
+  <body data-active-lab="battle">
+    <main class="terminal-shell">
+      <header class="topbar">
+        <div>
+          <h1>gomoku lab</h1>
+        </div>
+        <div class="top-controls" aria-label="界面颜色配置">
+          <nav class="lab-tabs" aria-label="实验室页面">
+            <button class="lab-tab is-active" type="button" data-lab-tab="battle">对战</button>
+            <button class="lab-tab" type="button" data-lab-tab="minimax">MINIMAX LAB</button>
+            <button class="lab-tab" type="button" data-lab-tab="train">NN lab(beta)</button>
+          </nav>
+          <label class="compact-field">
+            <span>配色</span>
+            <select id="theme-select">
+              <option value="paper" selected>白底终端</option>
+              <option value="dark">黑底终端</option>
+              <option value="green">绿屏终端</option>
+              <option value="amber">琥珀终端</option>
+              <option value="custom">自定义</option>
+            </select>
+          </label>
+          <label class="compact-field color-field">
+            <span>底色</span>
+            <input id="bg-color" type="color" value="#f7f7f1">
+          </label>
+          <label class="compact-field color-field">
+            <span>字色</span>
+            <input id="ink-color" type="color" value="#111111">
+          </label>
+          <div class="system-readout" aria-live="polite">
+            <span id="clock">00:00:00</span>
+            <span id="turn-readout">BLACK READY</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="board-panel" data-lab-view="battle" aria-label="五子棋棋盘">
+        <div class="board-toolbar">
+          <div class="segmented" role="group" aria-label="对战模式">
+            <button class="mode-button is-active" type="button" data-mode="human-human">人人</button>
+            <button class="mode-button" type="button" data-mode="human-ai">人机</button>
+            <button class="mode-button" type="button" data-mode="ai-ai">机机</button>
+          </div>
+          <div class="toolbar-actions">
+            <label class="nn-toggle">
+              <input id="nn-toggle" type="checkbox">
+              <span>启用NN</span>
+            </label>
+            <button id="hint-toggle" type="button" aria-pressed="false">提示 OFF</button>
+            <button id="new-game" type="button">新局</button>
+            <button id="undo-move" type="button">悔棋</button>
+            <button id="ai-step" type="button">AI一步</button>
+            <button id="auto-play" type="button" aria-pressed="false">AUTO</button>
+          </div>
+        </div>
+
+        <div class="board-wrap">
+          <canvas id="board-canvas" width="900" height="900" aria-label="15路五子棋棋盘"></canvas>
+          <div id="result-banner" class="result-banner" hidden>
+            <p id="result-title">BLACK WINS</p>
+            <span>可继续悔棋复盘</span>
+          </div>
+        </div>
+
+        <div class="status-strip">
+          <span id="game-status">BLACK TO MOVE</span>
+          <span id="move-count">MOVES 0</span>
+          <span id="time-cap">CAP -</span>
+        </div>
+      </section>
+
+      <aside id="control-panel" class="control-panel" data-lab-view="battle" aria-label="控制台">
+        <section class="panel-block config-block">
+          <h2 id="config-title">CONFIG</h2>
+
+          <div id="human-ai-config" class="mode-config">
+            <label>
+              <span>人类执子</span>
+              <select id="human-side">
+                <option value="1">黑</option>
+                <option value="2">白</option>
+              </select>
+            </label>
+            <label>
+              <span>机器引擎</span>
+              <select id="machine-engine">
+                <option value="v6-lab" selected>V6 Lab</option>
+                <option value="legacy-search">V1-V5 经典搜索</option>
+                <option value="nn-fusion">NN fusion</option>
+              </select>
+            </label>
+            <label>
+              <span>随机种子</span>
+              <div class="seed-row">
+                <input id="machine-seed" type="text" value="20260618" spellcheck="false">
+                <button id="machine-seed-refresh" class="seed-refresh" type="button" aria-label="refresh machine seed">RND</button>
+              </div>
+            </label>
+            <label>
+              <span>最长思考</span>
+              <input id="machine-time" type="range" min="300" max="12000" value="12000" step="100">
+            </label>
+            <output id="machine-time-output">12000MS</output>
+            <label>
+              <span>引擎智商</span>
+              <select id="machine-iq">
+                <option value="80">入门 80</option>
+                <option value="105">标准 105</option>
+                <option value="130">高手 130</option>
+                <option value="155" selected>大师 155</option>
+                <option value="custom">高级自定义</option>
+              </select>
+            </label>
+            <details id="machine-advanced" class="advanced-box">
+              <summary>高级选项</summary>
+              <div class="field-grid">
+                <label>
+                  <span>DEPTH</span>
+                  <input id="machine-depth" type="range" min="1" max="10" value="10">
+                </label>
+                <output id="machine-depth-output">10</output>
+                <label>
+                  <span>WIDTH</span>
+                  <input id="machine-width" type="range" min="8" max="48" value="48" step="2">
+                </label>
+                <label>
+                  <span>TT</span>
+                  <select id="machine-tt">
+                    <option value="auto" selected>AUTO</option>
+                    <option value="raw">RAW</option>
+                    <option value="sym">SYM</option>
+                  </select>
+                </label>
+                <output id="machine-width-output">48</output>
+                <output id="machine-iq-output" class="wide-output">IQ 155</output>
+              </div>
+            </details>
+          </div>
+
+          <div id="ai-ai-config" class="mode-config">
+            <div class="side-config">
+              <h3>黑方引擎</h3>
+              <label>
+                <span>版本</span>
+                <select id="black-engine">
+                  <option value="v6-lab" selected>V6 Lab</option>
+                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="nn-fusion">NN fusion</option>
+                </select>
+              </label>
+              <label>
+                <span>随机种子</span>
+                <div class="seed-row">
+                  <input id="black-seed" type="text" value="20260618-B" spellcheck="false">
+                  <button id="black-seed-refresh" class="seed-refresh" type="button" aria-label="refresh black seed">RND</button>
+                </div>
+              </label>
+              <label>
+                <span>最长思考</span>
+                <input id="black-time" type="range" min="300" max="12000" value="12000" step="100">
+              </label>
+              <output id="black-time-output">TIME 12000MS</output>
+              <label>
+                <span>TT</span>
+                <select id="black-tt">
+                  <option value="auto" selected>AUTO</option>
+                  <option value="raw">RAW</option>
+                  <option value="sym">SYM</option>
+                </select>
+              </label>
+              <label>
+                <span>DEPTH</span>
+                <input id="black-depth" type="range" min="1" max="10" value="10">
+              </label>
+              <output id="black-depth-output">DEPTH 10</output>
+              <label>
+                <span>WIDTH</span>
+                <input id="black-width" type="range" min="8" max="48" value="48" step="2">
+              </label>
+              <output id="black-width-output">WIDTH 48</output>
+            </div>
+            <div class="side-config">
+              <h3>白方引擎</h3>
+              <label>
+                <span>版本</span>
+                <select id="white-engine">
+                  <option value="v6-lab" selected>V6 Lab</option>
+                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="nn-fusion">NN fusion</option>
+                </select>
+              </label>
+              <label>
+                <span>随机种子</span>
+                <div class="seed-row">
+                  <input id="white-seed" type="text" value="20260618-W" spellcheck="false">
+                  <button id="white-seed-refresh" class="seed-refresh" type="button" aria-label="refresh white seed">RND</button>
+                </div>
+              </label>
+              <label>
+                <span>最长思考</span>
+                <input id="white-time" type="range" min="300" max="12000" value="12000" step="100">
+              </label>
+              <output id="white-time-output">TIME 12000MS</output>
+              <label>
+                <span>TT</span>
+                <select id="white-tt">
+                  <option value="auto" selected>AUTO</option>
+                  <option value="raw">RAW</option>
+                  <option value="sym">SYM</option>
+                </select>
+              </label>
+              <label>
+                <span>DEPTH</span>
+                <input id="white-depth" type="range" min="1" max="10" value="10">
+              </label>
+              <output id="white-depth-output">DEPTH 10</output>
+              <label>
+                <span>WIDTH</span>
+                <input id="white-width" type="range" min="8" max="48" value="48" step="2">
+              </label>
+              <output id="white-width-output">WIDTH 48</output>
+            </div>
+          </div>
+
+          <div id="hint-config" class="mode-config">
+            <div class="side-config">
+              <h3>黑方提示引擎</h3>
+              <label>
+                <span>版本</span>
+                <select id="black-hint-engine">
+                  <option value="v6-lab" selected>V6 Lab</option>
+                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="nn-fusion">NN fusion</option>
+                </select>
+              </label>
+              <label>
+                <span>DEPTH</span>
+                <input id="black-hint-depth" type="range" min="1" max="5" value="3">
+              </label>
+              <output id="black-hint-depth-output">DEPTH 3</output>
+              <label>
+                <span>WIDTH</span>
+                <input id="black-hint-width" type="range" min="8" max="32" value="18" step="2">
+              </label>
+              <output id="black-hint-width-output">WIDTH 18</output>
+            </div>
+            <div class="side-config">
+              <h3>白方提示引擎</h3>
+              <label>
+                <span>版本</span>
+                <select id="white-hint-engine">
+                  <option value="v6-lab" selected>V6 Lab</option>
+                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="nn-fusion">NN fusion</option>
+                </select>
+              </label>
+              <label>
+                <span>DEPTH</span>
+                <input id="white-hint-depth" type="range" min="1" max="5" value="3">
+              </label>
+              <output id="white-hint-depth-output">DEPTH 3</output>
+              <label>
+                <span>WIDTH</span>
+                <input id="white-hint-width" type="range" min="8" max="32" value="18" step="2">
+              </label>
+              <output id="white-hint-width-output">WIDTH 18</output>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-block trace-block">
+          <h2>ENGINE TRACE</h2>
+          <dl class="stats-grid">
+            <div>
+              <dt>depth</dt>
+              <dd id="stat-depth">-</dd>
+            </div>
+            <div>
+              <dt>nodes</dt>
+              <dd id="stat-nodes">-</dd>
+            </div>
+            <div>
+              <dt>score</dt>
+              <dd id="stat-score">-</dd>
+            </div>
+            <div>
+              <dt>time</dt>
+              <dd id="stat-time">-</dd>
+            </div>
+          </dl>
+          <div id="depth-trace" class="trace-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-block candidate-block">
+          <h2>CANDIDATES / MOVE SCORE</h2>
+          <ol id="candidate-list" class="candidate-list"></ol>
+        </section>
+      </aside>
+
+      <section class="lab-page minimax-page" data-lab-view="minimax" aria-label="minimax 搜索树实验室">
+        <div class="lab-main-panel">
+          <div class="lab-panel-title">
+            <div>
+              <h2>规则搜索模型实验台</h2>
+              <p>构建测试局面，配置搜索策略，并将参数化模型保存到对战页验证。</p>
+            </div>
+            <div class="mini-readout" aria-live="polite">
+              <span id="minimax-turn">黑方</span>
+              <span id="minimax-node-count">节点 0</span>
+              <span id="minimax-best">最佳 -</span>
+            </div>
+          </div>
+
+          <div class="lab-board-grid">
+            <div class="lab-board-wrap">
+              <div class="minimax-board-toolbar" aria-label="Minimax棋盘操作">
+                <button id="minimax-undo" type="button">撤回一步</button>
+                <button id="minimax-clear" type="button">清空棋盘</button>
+                <button id="minimax-demo" type="button">载入示例</button>
+              </div>
+              <canvas id="minimax-board" width="720" height="720" aria-label="minimax sandbox board"></canvas>
+            </div>
+            <div class="lab-console">
+              <section class="simple-flow" aria-label="Minimax搜索模型配置流程">
+                <div class="flow-step is-live">
+                  <span>1</span>
+                  <strong>构建局面</strong>
+                  <p>在棋盘上布置测试局面，或载入内置示例作为搜索输入。</p>
+                </div>
+                <div class="flow-step">
+                  <span>2</span>
+                  <strong>选择策略</strong>
+                  <p>选择搜索预设，调整均衡、进攻、防守或低延迟取向。</p>
+                </div>
+                <div class="flow-step">
+                  <span>3</span>
+                  <strong>分析搜索</strong>
+                  <p>查看候选落点、评分回传与 Alpha-Beta 剪枝过程。</p>
+                </div>
+                <div class="flow-step">
+                  <span>4</span>
+                  <strong>保存模型</strong>
+                  <p>确认参数后保存为对战页可调用的规则模型。</p>
+                </div>
+              </section>
+              <div class="preset-strip" aria-label="选择Minimax搜索策略">
+                <button type="button" data-minimax-preset="balanced">均衡策略</button>
+                <button type="button" data-minimax-preset="attack">进攻策略</button>
+                <button type="button" data-minimax-preset="defense">防守策略</button>
+                <button type="button" data-minimax-preset="fast">快速搜索</button>
+              </div>
+              <details class="lab-guide" open>
+                <summary>Minimax 搜索原理</summary>
+                <div class="guide-grid">
+                  <div>
+                    <strong>搜索流程</strong>
+                    <ol>
+                      <li>枚举当前局面的合法候选落点。</li>
+                      <li>递归模拟双方后续应手。</li>
+                      <li>通过静态评估与极大极小回传选择最高收益落点。</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <strong>参数配置是什么</strong>
+                    <p>配置规则模型的搜索深度、候选宽度、棋形权重与剪枝策略。配置会保存在浏览器本地。</p>
+                  </div>
+                </div>
+                <p id="minimax-principle-note" class="principle-note">先运行一次搜索，再逐层展开搜索树，可观察候选评分如何从叶节点回传到根节点。</p>
+                <div class="principle-deck" aria-label="Minimax与AlphaBeta原理卡片">
+                  <div class="principle-card is-active" data-principle-card="0">
+                    <div class="principle-card-face principle-card-front">
+                      <strong>Minimax 如何决策</strong>
+                      <p>模型将“己方落子—对方应手”的交替过程表示为博弈树。己方选择最大评分，对手被假设为选择最小化己方收益的应手。</p>
+                    </div>
+                    <div class="principle-card-face principle-card-back">
+                      <strong>评分如何回传</strong>
+                      <p>叶节点由棋形评估函数打分，分数按极大层/极小层逐级回传，根节点得分最高的候选即为推荐落点。</p>
+                    </div>
+                  </div>
+                  <div class="principle-card" data-principle-card="1">
+                    <div class="principle-card-face principle-card-front">
+                      <strong>Alpha-Beta 剪枝</strong>
+                      <p>当某条分支已不可能影响最终选择时，搜索会提前停止展开该分支，把计算预算留给更有价值的候选。</p>
+                    </div>
+                    <div class="principle-card-face principle-card-back">
+                      <strong>剪枝收益</strong>
+                      <p>剪枝不改变 Minimax 的理论结果，但能减少节点数量，使相同时间内搜索更深或覆盖更多关键变化。</p>
+                    </div>
+                  </div>
+                  <div class="principle-card" data-principle-card="2">
+                    <div class="principle-card-face principle-card-front">
+                      <strong>静态评估函数</strong>
+                      <p>到达搜索深度上限后，模型会根据连五、活四、冲四、活三、中心控制等特征估计局面价值。</p>
+                    </div>
+                    <div class="principle-card-face principle-card-back">
+                      <strong>参数影响</strong>
+                      <p>提高某类棋形权重会增强模型对该模式的偏好。深度和宽度越高，决策通常更稳定，但计算开销也会上升。</p>
+                    </div>
+                  </div>
+                  <div class="principle-card-nav" role="group" aria-label="原理卡片切换">
+                    <button id="minimax-principle-prev" type="button">上一项</button>
+                    <button id="minimax-principle-flip" type="button">切换说明</button>
+                    <button id="minimax-principle-next" type="button">下一项</button>
+                  </div>
+                </div>
+              </details>
+              <div class="button-row">
+                <button id="minimax-run" type="button">运行搜索</button>
+                <button id="minimax-step" type="button">展开搜索树</button>
+                <button id="minimax-reset" type="button">重置示例</button>
+                <button id="minimax-export" type="button">导出配置</button>
+              </div>
+              <details class="simple-advanced">
+                <summary>搜索参数（高级选项，默认预设）</summary>
+                <div class="field-grid">
+                  <label>
+                    <span>搜索深度</span>
+                    <small class="param-help">决定 Minimax 向后推演的层数。深度越高，局面判断更充分，但计算会更慢。</small>
+                    <input id="minimax-depth" type="range" min="1" max="4" value="2">
+                  </label>
+                  <output id="minimax-depth-output">2</output>
+                  <label>
+                    <span>候选宽度</span>
+                    <small class="param-help">每一层保留的候选落点数量。宽度越大，搜索覆盖更广，也更吃性能。</small>
+                    <input id="minimax-width" type="range" min="2" max="5" value="4">
+                  </label>
+                  <output id="minimax-width-output">4</output>
+                  <label>
+                    <span>随机扰动</span>
+                    <small class="param-help">在评分接近时加入少量变化。数值越高，对局越不固定；想要稳定复现就调低。</small>
+                    <input id="minimax-randomness" type="range" min="0" max="30" value="4">
+                  </label>
+                  <output id="minimax-randomness-output">4</output>
+                  <label class="nn-toggle lab-check">
+                    <input id="minimax-alpha-beta" type="checkbox" checked>
+                    <span>启用 Alpha-Beta 剪枝</span>
+                  </label>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <aside class="lab-side-panel">
+          <section class="panel-block score-panel">
+            <div class="panel-title-row">
+              <h2>评估函数权重</h2>
+              <span class="pattern-legend">棋形权重用于静态评估</span>
+            </div>
+            <details id="minimax-pattern-picker" class="pattern-picker">
+              <summary>
+                <span>选择棋形特征</span>
+                <strong id="minimax-pattern-current">活三</strong>
+              </summary>
+              <div id="minimax-pattern-menu" class="pattern-menu" aria-live="polite"></div>
+              <button id="minimax-pattern-new" type="button">新增自定义棋形</button>
+            </details>
+            <div class="pattern-editor">
+              <label>
+                <span>名称</span>
+                <input id="minimax-pattern-edit-name" type="text" maxlength="16" spellcheck="false">
+              </label>
+              <div class="pattern-preview-shell">
+                <span>棋形预览</span>
+                <div id="minimax-pattern-edit-preview" class="pattern-edit-preview"></div>
+              </div>
+              <label>
+                <span>棋形编码（0空 1己 2敌 3边）</span>
+                <input id="minimax-pattern-edit-sequence" type="text" maxlength="11" spellcheck="false">
+              </label>
+              <label class="pattern-score-control">
+                <span>分数 <output id="minimax-pattern-edit-score-output">0</output></span>
+                <input id="minimax-pattern-edit-score" type="range" min="0" max="100000" value="0" step="50">
+              </label>
+              <p id="minimax-pattern-edit-info" class="pattern-edit-info">选择棋形特征查看当前评估权重。</p>
+              <button id="minimax-pattern-delete" type="button">删除自定义棋形</button>
+            </div>
+            <div class="weight-store" hidden>
+              <input class="minimax-score" data-score-key="five" type="range" min="20000" max="200000" value="100000" step="1000">
+              <input class="minimax-score" data-score-key="openFour" type="range" min="6000" max="60000" value="30000" step="500">
+              <input class="minimax-score" data-score-key="four" type="range" min="2000" max="30000" value="12000" step="250">
+              <input class="minimax-score" data-score-key="openThree" type="range" min="400" max="8000" value="2600" step="100">
+              <input class="minimax-score" data-score-key="three" type="range" min="100" max="4000" value="700" step="50">
+              <input class="minimax-score" data-score-key="center" type="range" min="0" max="120" value="18" step="1">
+            </div>
+          </section>
+          <section class="panel-block engine-code-panel">
+              <h2>保存搜索配置</h2>
+            <div class="button-row">
+              <button id="minimax-save" type="button">保存到对战页</button>
+              <button id="minimax-import" type="button">导入配置</button>
+            </div>
+            <details class="simple-advanced">
+              <summary>配置备份</summary>
+              <textarea id="minimax-engine-code" class="engine-code-editor" rows="9" spellcheck="false"></textarea>
+            </details>
+            <input id="minimax-import-file" type="file" accept="application/json,.json" hidden>
+            <pre id="minimax-profile-log" class="lab-pre">就绪</pre>
+          </section>
+        </aside>
+
+        <section class="tree-wide-panel" aria-label="Minimax搜索树展开">
+          <div class="tree-wide-head">
+            <h2>它的思考过程</h2>
+            <div id="minimax-layer-readout" class="mini-readout" aria-live="polite">
+              <span>第 0 层</span>
+              <span>可见 0</span>
+              <span>剪枝 0</span>
+            </div>
+          </div>
+          <div id="minimax-tree" class="tree-list" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <section class="lab-page train-page" data-lab-view="train" aria-label="NN lab(beta)">
+        <div class="lab-main-panel">
+          <div class="lab-panel-title">
+            <div>
+              <h2>训练我的 AI</h2>
+              <p>用你的电脑慢慢培养出你自己的神经网络。</p>
+            </div>
+            <div class="mini-readout" aria-live="polite">
+              <span id="train-model-name">gomoku-apprentice-00</span>
+              <span id="train-samples">数据集 0</span>
+              <span id="train-generation">第 0 代</span>
+            </div>
+          </div>
+
+          <div class="lab-board-grid">
+            <div class="lab-board-wrap">
+              <canvas id="train-board" width="720" height="720" aria-label="personal bot policy heatmap"></canvas>
+            </div>
+            <div class="lab-console">
+              <section class="simple-flow train-flow" aria-label="本机AI训练流程">
+                <div id="train-step-data" class="flow-step is-live">
+                  <span>1</span>
+                  <strong>准备练习题</strong>
+                  <p>用现成模型生成练习题，也可以用你在对战页下过的棋。</p>
+                </div>
+                <div id="train-step-train" class="flow-step">
+                  <span>2</span>
+                  <strong>本机训练</strong>
+                  <p>大量和烤机档会准备更多练习题；当前浏览器版会在后台练。</p>
+                </div>
+                <div id="train-step-test" class="flow-step">
+                  <span>3</span>
+                  <strong>本次训练效果</strong>
+                  <p>查看本次训练后，它和现成模型或你的棋谱有多接近。</p>
+                </div>
+                <div id="train-step-save" class="flow-step">
+                  <span>4</span>
+                  <strong>保存</strong>
+                  <p>保存在本地。</p>
+                </div>
+              </section>
+              <div id="train-flow-status" class="local-run-status" aria-live="polite">先准备练习题。想省心的话，点“现成模型出题”。</div>
+              <div class="preset-strip" aria-label="选择训练数据量档位">
+                <button type="button" data-train-preset="quick">少量</button>
+                <button type="button" data-train-preset="normal">适中</button>
+                <button type="button" data-train-preset="strong">大量</button>
+                <button type="button" data-train-preset="gpu4060">烤机</button>
+              </div>
+              <div class="button-row">
+                <button id="train-v4" type="button">现成模型出题</button>
+                <button id="train-style" type="button">学习用户对局</button>
+                <button id="train-start" type="button">开始训练</button>
+                <button id="train-pause" type="button">暂停</button>
+              </div>
+              <div class="button-row">
+                <button id="train-reset" type="button">重练</button>
+                <button id="train-arena" type="button">本次训练效果</button>
+                <button id="train-export" type="button">下载模型</button>
+                <button id="train-import" type="button">导入模型</button>
+              </div>
+              <input id="train-import-file" type="file" accept="application/json,.json" hidden>
+              <details class="simple-advanced">
+                <summary>训练参数（高级选项，默认预设）</summary>
+                <div class="field-grid">
+                  <label>
+                    <span>训练轮数 Epochs</span>
+                    <small class="param-help">模型完整看完数据集的次数。数据量越大，通常可以适当增加轮数。</small>
+                    <input id="train-epochs" type="range" min="1" max="240" value="30">
+                  </label>
+                  <output id="train-epochs-output">30</output>
+                  <label>
+                    <span>学习率</span>
+                    <small class="param-help">控制每次参数更新的步幅。过高可能震荡，过低会收敛较慢。</small>
+                    <input id="train-rate" type="range" min="1" max="80" value="18">
+                  </label>
+                  <output id="train-rate-output">0.018</output>
+                  <label>
+                    <span>批量大小 Batch Size</span>
+                    <small class="param-help">单次参与训练的样本数量。显存和内存充足时，可以提高批量来增加吞吐。</small>
+                    <input id="train-batch" type="range" min="8" max="1024" value="128" step="8">
+                  </label>
+                  <output id="train-batch-output">128</output>
+                  <label>
+                    <span>温度系数</span>
+                    <small class="param-help">控制教师分布的平滑程度。温度低时答案更集中，温度高时会保留更多备选落点。</small>
+                    <input id="train-temperature" type="range" min="4" max="40" value="14">
+                  </label>
+                  <output id="train-temperature-output">1.4</output>
+                </div>
+              </details>
+              <dl class="stats-grid train-stats">
+                <div>
+                  <dt>整体误差</dt>
+                  <dd id="train-loss">-</dd>
+                </div>
+                <div>
+                  <dt>选点误差</dt>
+                  <dd id="train-policy-loss">-</dd>
+                </div>
+                <div>
+                  <dt>判断误差</dt>
+                  <dd id="train-value-mae">-</dd>
+                </div>
+                <div>
+                  <dt>接近程度</dt>
+                  <dd id="train-top3">-</dd>
+                </div>
+                <div>
+                  <dt>评分</dt>
+                  <dd id="train-rating">1000</dd>
+                </div>
+                <div>
+                  <dt>本次训练效果</dt>
+                  <dd id="train-arena-score">-</dd>
+                </div>
+              </dl>
+              <div id="train-loss-chart" class="loss-chart" aria-label="训练误差曲线"></div>
+              <pre id="train-dataset-summary" class="lab-pre compact-lab-pre">练习题来源 -</pre>
+            </div>
+          </div>
+        </div>
+
+        <aside class="lab-side-panel">
+          <section class="panel-block">
+            <h2>它现在会想下哪里</h2>
+            <ol id="train-policy-list" class="candidate-list"></ol>
+          </section>
+          <section class="panel-block">
+            <h2>训练记录</h2>
+            <pre id="train-log" class="lab-pre">就绪</pre>
+          </section>
+          <section class="panel-block">
+            <h2>留下来的模型</h2>
+            <ol id="train-generation-list" class="custom-pattern-list"></ol>
+          </section>
+        </aside>
+      </section>
+
+      <section class="log-panel" data-lab-view="battle" aria-label="终端日志">
+        <div>
+          <h2>MOVE STACK</h2>
+          <ol id="move-list" class="move-list"></ol>
+        </div>
+        <div>
+          <h2>STDOUT</h2>
+          <pre id="event-log" aria-live="polite"></pre>
+        </div>
+      </section>
+      <footer class="site-credits" aria-label="致谢">
+        <strong>致谢</strong>
+        <ol>
+          <li>灵感来自于对机器学习的好奇，采用五子棋平台进行实现。</li>
+          <li>AI 使用说明：前端 UI 由 AI 修饰，部分迭代及蒸馏算法借助 AI 完成。</li>
+          <li>感谢施杰亨提供两张 RTX5090 训练了 5 代模型，并提供 ChatGPT 5.5 Pro 使用权。</li>
+          <li>V6 模型部分代码来源 <a href="https://github.com/dhbloo/rapfi" target="_blank" rel="noopener noreferrer">dhbloo/rapfi</a>。</li>
+          <li>若存在任何使用问题，请加 QQ 联系：<a href="https://qm.qq.com/q/LOeE3QzGY8" target="_blank" rel="noopener noreferrer">2590278934</a>。</li>
+        </ol>
+      </footer>
+    </main>
+  </body>
+</html>
