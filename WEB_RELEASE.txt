@@ -1,0 +1,8 @@
+﻿gomoku-lab web release v4.1.2
+
+This package contains the browser/web runtime only. It intentionally excludes C/C++ source,
+build scripts, tests, docs, and Git metadata.
+
+This build supports direct file:// opening for the V6 engine by preloading V6 wasm/data
+from v6-engine-inline-assets.js inside the worker. Serving the folder as static files is
+still supported.

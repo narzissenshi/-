@@ -1,142 +1,110 @@
-# Gomoku Lab
+# Five In Row
 
-Gomoku Lab 是一个运行在浏览器里的五子棋 AI 实验网页。它把传统规则搜索、Minimax 参数实验、神经网络训练和模型保存放在同一个页面中，方便直接体验“机器怎么下棋”，也方便用本机数据慢慢训练自己的神经网络。
+一个基于命令行的 15x15 五子棋项目，当前支持人人对战、人机强引擎对战、黑棋禁手、胜负判断和悔棋。
 
-本项目使用原生 HTML、CSS 与 JavaScript 编写，不依赖 Vue、React 等前端框架。页面可以直接用浏览器打开，也可以作为静态网页部署。
-
-## 主要功能
-
-- 五子棋对战：支持人机对战、AI 对 AI、提示引擎和走法记录。
-- 多种引擎：提供 `V6 Lab`、`V1-V5 经典搜索`、`神经网络融合` 等选择。
-- 搜索可视化：展示候选点、评分、搜索原因、节点数、耗时和引擎日志。
-- Minimax 实验台：可调节搜索深度、候选宽度、随机性和评估函数权重。
-- 本机神经网络训练：可以从现成模型生成练习题，也可以学习用户对局并蒸馏优化。
-- 模型管理：训练后的模型保存在本地浏览器中，也支持下载、导入和继续迭代。
-
-## 快速开始
-
-### 直接打开
-
-双击或用浏览器打开：
+## 目录结构
 
 ```text
-index.html
+.
+├── inc/              # 公共头文件
+├── src/              # C 源码
+├── tests/            # 自动化测试
+├── index.html        # 网页版五子棋入口
+├── styles.css        # 网页样式
+├── script.js         # 网页交互和搜索引擎
+├── presearch-books/  # 网页 AI 开局预搜索书
+├── bin/              # 可执行文件输出目录，构建生成
+├── build*/           # CMake 构建目录，构建生成
+├── CMakeLists.txt    # CMake 构建入口
+└── docs/             # 架构说明
 ```
 
-推荐使用新版 Chrome 或 Edge。V6 引擎使用 WebAssembly 和 Web Worker，训练功能也会使用浏览器 Worker，因此旧浏览器可能无法完整运行。
+## 构建
 
-### 本地静态服务
+需要先安装 CMake 和可用的 C 编译器，例如 MinGW-w64、MSVC 或 Clang。
 
-如果浏览器对本地文件权限限制较严格，可以在项目目录下启动静态服务：
+```powershell
+cmake -S . -B build
+cmake --build build
+```
+
+构建产物默认输出到 `bin/five_in_row.exe`。
+
+## 运行
+
+```powershell
+.\bin\five_in_row.exe
+```
+
+输入示例：
+
+- `H8`：在 H 列第 8 行落子
+- `00`：退出当前对局
+- `11`：悔棋一步
+
+人机强引擎模式默认使用：
+
+- 迭代加深搜索
+- Principal Variation Search / alpha-beta 剪枝
+- Zobrist 哈希置换表
+- 候选点裁剪和棋形排序
+- 攻防棋形评分
+- 黑棋禁手过滤
+
+## 网页版
+
+本分支在仓库根目录提供静态网页版 `gomoku`，打开 `index.html` 即可运行。网页包含人人、人机、机机对战，黑棋禁手校验，悔棋，候选点评分，PVS/VCF 搜索和本地预搜索书，不依赖在线资源。工具栏中的“启用NN”开关勾选后，会把机器思考和提示切换到 NN hybrid 引擎：先筛直接胜和必须围堵，再调用浏览器端 policy/value 推理排序。
+
+生成课程提交 zip：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_submission.ps1
+```
+
+脚本会把网页必需文件暂存到 `dist/submission-root/`，压缩为 `dist/gomoku.zip`，并运行 CS101 提交结构校验。
+
+## 开发约定
+
+- 源码统一使用 UTF-8。
+- C 标准使用 C11。
+- 构建产物放在 `build/` 和 `bin/`，不纳入版本管理。
+- 头文件只暴露模块边界，模块内部辅助函数使用 `static`。
+
+更多模块关系见 [docs/architecture.md](docs/architecture.md)。
+
+## NN 融合引擎分支
+
+`nn-engine` 分支提供实验性的纯 C 神经网络融合引擎：
+
+- Python checkpoint 导出为本地 `.gnn` INT8 权重包。
+- C 端加载 `.gnn`，执行纯 C policy/value 推理。
+- `nn-fusion` profile 先做立即胜/防守短路，再用 NN policy 和静态棋形补偿选点。
+
+本地 smoke：
 
 ```bash
-python -m http.server 8080
+python3 tools/export_gomoku_alpha_weights.py \
+  --checkpoint /data/home/shijieheng/gomoku-alphazero/checkpoints/autonomous_refined.pt \
+  --output models/autonomous_refined_i8.gnn \
+  --metadata models/autonomous_refined_i8.json
+cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-debug
+ctest --test-dir build-debug --output-on-failure
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target nn_engine_probe pbrain_five_in_row
+bin/nn_engine_probe models/autonomous_refined_i8.gnn --bench 20
+FIVE_IN_ROW_ENGINE_PROFILE=nn-fusion \
+FIVE_IN_ROW_NN_WEIGHTS=models/autonomous_refined_i8.gnn \
+FIVE_IN_ROW_NN_TIME_MS=2000 \
+FIVE_IN_ROW_NN_HARD_TIME_MS=3000 \
+bin/pbrain-5inrow
 ```
 
-然后访问：
+详细工作流见 [docs/nn-engine-workflow.md](docs/nn-engine-workflow.md)。
 
-```text
-http://localhost:8080
+## 测试
+
+```powershell
+cmake --build build-msvc
+ctest --test-dir build-msvc -C Debug --output-on-failure
 ```
-
-这个项目没有构建步骤，也不需要安装前端依赖。
-
-## 引擎说明
-
-### V6 Lab
-
-V6 Lab 是当前页面中强度最高的引擎入口，基于 WebAssembly Worker 运行。V6 模型部分代码来源于 [dhbloo/rapfi](https://github.com/dhbloo/rapfi)，相关授权说明见 `NOTICE`、`COPYING` 和 `THIRD_PARTY/`。
-
-### V1-V5 经典搜索
-
-V1 到 V5 的传统搜索线已经在界面中合并为 `V1-V5 经典搜索`。它保留了早期版本的 Minimax、PVS、VCF、棋形评估和防守增强思路，界面上只显示一个入口，底层默认使用当前较强的 V5 搜索实现。
-
-### 神经网络融合
-
-`神经网络融合` 不是单纯的神经网络下棋，而是混合引擎。它会先处理立即胜利和必须防守的局面，再用 policy/value 风格的评估为候选落点排序，同时结合传统棋形评分、中心权重和威胁判断。若神经网络评估不可用或超时，会回退到传统搜索。
-
-## Minimax 实验台
-
-Minimax 实验台用于观察规则搜索模型如何做决定。你可以调整：
-
-- 搜索深度：向后预判的层数，越高越慢，但通常更稳。
-- 候选宽度：每层保留多少个可能落点，越高越全面。
-- 随机性：控制引擎在相近分数之间的选择波动。
-- 评估函数权重：控制五连、活四、冲四、活三、中心等棋形的分值。
-
-这个模块适合展示“传统搜索 AI”如何通过局面评分和向后推演选点。
-
-## 神经网络训练
-
-训练页面面向不熟悉机器学习的用户设计，核心流程是：
-
-1. 准备练习题：由现成模型出题，或从用户对局中提取样本。
-2. 本机训练：浏览器在本机执行训练，不需要上传数据。
-3. 查看效果：通过误差、Top-1、Top-3 和候选点热力图观察本次训练效果。
-4. 保存模型：训练结果保存在本地，可以继续迭代或下载备份。
-
-### 训练档位
-
-| 档位 | 练习题数量 | 训练轮数 | 建议用途 |
-| --- | ---: | ---: | --- |
-| 少量 | 512 | 8 | 快速试运行，确认流程是否正常 |
-| 适中 | 4,096 | 30 | 日常训练，速度和效果较均衡 |
-| 大量 | 12,000 | 80 | 更充分的数据训练，适合性能较好的电脑 |
-| 烤机 | 32,768 | 160 | 长时间训练，适合 RTX 4060 以上级别的高性能整机 |
-
-注意：当前训练主要在浏览器环境中执行，实际速度取决于浏览器、CPU、内存和系统调度。高性能显卡的电脑通常整体性能余量更大，但本网页不是 CUDA/PyTorch 这类专业训练框架。
-
-## 数据保存
-
-训练样本、模型和配置会优先保存在浏览器 IndexedDB 中；如果 IndexedDB 不可用，会尝试使用 localStorage。清理浏览器站点数据、无痕模式关闭、或更换浏览器后，本地模型可能丢失。
-
-建议重要模型及时使用“下载模型”导出为 JSON 文件，再用“导入模型”恢复。
-
-## 项目结构
-
-```text
-index.html                 页面入口
-styles.css                 页面样式
-script.js                  对战、搜索、棋盘和主交互逻辑
-gomoku-rules.js            五子棋规则判断
-minimax-lab.js             Minimax 实验台
-trainer.js                 神经网络训练、样本生成和模型评估
-trainer-worker.js          训练 Worker
-model-store.js             本地模型和样本存储
-presearch-data.js          预搜索数据入口
-presearch-worker.js        预搜索数据加载 Worker
-presearch-books/           预搜索棋谱数据
-v6-engine-client.js        V6 引擎浏览器端调用
-v6-engine-worker.js        V6 引擎 Worker
-v6-engine-runtime.*        V6 WebAssembly 运行时资源
-v6-engine-inline-assets.js file:// 模式下使用的内联资源
-THIRD_PARTY/               第三方资源说明
-NOTICE                     第三方代码来源和授权声明
-COPYING                    GPLv3 授权文本
-```
-
-## 常见问题
-
-### V6 引擎无法启动
-
-优先使用 Chrome 或 Edge。若直接打开 `index.html` 出现 Worker 或 WASM 加载问题，请改用本地静态服务运行。
-
-### 训练很慢或页面卡顿
-
-先选择“少量”或“适中”。“大量”和“烤机”会生成更多练习题并训练更久，适合在性能较好的电脑上运行。训练时不要关闭页面。
-
-### 模型不见了
-
-模型保存在当前浏览器的本地数据中。如果清理了站点数据、换了浏览器或使用无痕模式，模型可能消失。重要模型请下载备份。
-
-## 致谢
-
-1. 灵感来自于对机器学习的好奇，采用五子棋平台进行实现。
-2. AI 使用说明：前端 UI 由 AI 修饰，部分迭代及蒸馏算法借助 AI 完成。
-3. 感谢施杰亨提供两张 RTX5090 训练了 5 代模型，并提供 ChatGPT 5.5 Pro 使用权。
-4. V6 模型部分代码来源 [dhbloo/rapfi](https://github.com/dhbloo/rapfi)。
-5. 若存在任何使用问题，请加 QQ 联系：[2590278934](https://qm.qq.com/q/LOeE3QzGY8)。
-
-## 授权与第三方代码
-
-本项目包含 Rapfi 派生的 V6 引擎相关代码和资源。Rapfi 源文件声明使用 GPL v3 或更高版本授权，网络权重相关说明见 `THIRD_PARTY/v6-networks/README.md`。分发或二次使用时，请同时查看并遵守 `NOTICE`、`COPYING` 和 `THIRD_PARTY/` 中的说明。
