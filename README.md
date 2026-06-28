@@ -53,7 +53,7 @@ cmake --build build
 
 ## 网页版
 
-本分支在仓库根目录提供静态网页版 `gomoku`，打开 `index.html` 即可运行。网页包含人人、人机、机机对战，黑棋禁手校验，悔棋，候选点评分，PVS/VCF 搜索和本地预搜索书，不依赖在线资源。工具栏中的“启用NN”开关勾选后，会把机器思考和提示切换到 NN hybrid 引擎：先筛直接胜和必须围堵，再调用浏览器端 policy/value 推理排序。
+本分支在仓库根目录提供静态网页版 `gomoku`，打开 `index.html` 即可运行。网页包含人人、人机、机机对战，黑棋禁手校验，悔棋，候选点评分，V5 经典搜索、V6 Lab、NN fusion 和本地预搜索书，不依赖在线资源。需要使用神经网络融合时，直接在引擎下拉框中选择 `NN fusion`。
 
 生成课程提交 zip：
 
@@ -108,3 +108,11 @@ bin/pbrain-5inrow
 cmake --build build-msvc
 ctest --test-dir build-msvc -C Debug --output-on-failure
 ```
+
+## 致谢
+
+1. 灵感来自于对机器学习的好奇，采用五子棋平台进行实现。
+2. AI 使用说明：前端 UI 由 AI 修饰，部分迭代及蒸馏算法借助 AI 完成。
+3. 感谢施杰亨提供两张 RTX5090 训练了 neutral network 模型，并提供 ChatGPT 5.5 Pro 使用权。
+4. V6 模型部分代码来源 [dhbloo/rapfi](https://github.com/dhbloo/rapfi)。
+5. 若存在任何使用问题，请加 QQ 联系：[2590278934](https://qm.qq.com/q/LOeE3QzGY8)。

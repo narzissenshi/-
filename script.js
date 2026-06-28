@@ -47,7 +47,6 @@
   const PREHEAT_TIME_LIMIT_MS = 180;
   const TIME_LIMIT_MS = 12000;
   const LAB_STRONG_VERSION = "v5-lab-strong";
-  const LEGACY_ENGINE_VERSION = "legacy-search";
   const V6_ENGINE_VERSION = "v6-lab";
   const LAB_ENGINE_PREFIX = "lab:";
   const LAB_ENGINE_REGISTRY = new Map();
@@ -105,7 +104,6 @@
     aiStep: $("#ai-step"),
     autoPlay: $("#auto-play"),
     hintToggle: $("#hint-toggle"),
-    nnToggle: $("#nn-toggle"),
     resultBanner: $("#result-banner"),
     resultTitle: $("#result-title"),
     humanSide: $("#human-side"),
@@ -1515,16 +1513,6 @@
         this.render();
         this.requestHint();
       });
-      ui.nnToggle.addEventListener("change", () => {
-        this.lastStats = null;
-        this.cancelHumanPreheat();
-        this.writeLog(ui.nnToggle.checked ? "NN HYBRID ON" : "NN HYBRID OFF");
-        this.render();
-        this.requestHint();
-        this.scheduleAiIfNeeded();
-        this.scheduleHumanPreheat();
-      });
-
       ui.humanSide.addEventListener("change", () => {
         this.humanSide = Number(ui.humanSide.value);
         this.writeLog(`HUMAN ${stoneName(this.humanSide)}`);
@@ -2034,7 +2022,7 @@
       if (String(baseVersion || "").startsWith(LAB_ENGINE_PREFIX)) {
         return baseVersion;
       }
-      return ui.nnToggle.checked ? "nn-fusion" : resolveEngineVersion(baseVersion);
+      return baseVersion;
     }
 
     syncOutputs() {
@@ -2073,7 +2061,6 @@
       ui.hintToggle.hidden = this.mode !== "human-human";
       ui.hintToggle.textContent = this.hintEnabled ? "提示 ON" : "提示 OFF";
       ui.hintToggle.setAttribute("aria-pressed", String(this.hintEnabled));
-      ui.nnToggle.closest(".nn-toggle").classList.toggle("is-active", ui.nnToggle.checked);
       ui.autoPlay.hidden = this.mode !== "ai-ai";
       ui.aiStep.hidden = this.mode === "human-human";
       ui.autoPlay.setAttribute("aria-pressed", String(this.auto));
@@ -2258,14 +2245,20 @@
     }
 
     makeTimeCapText() {
-      const prefix = ui.nnToggle.checked ? "NN CAP" : "CAP";
       if (this.mode === "human-ai") {
+        const prefix = ui.machineEngine.value === "nn-fusion" ? "NN CAP" : "CAP";
         return `${prefix} ${ui.machineTime.value}MS`;
       }
       if (this.mode === "ai-ai") {
+        const activeEngine = this.board.current === BLACK ? ui.blackEngine.value : ui.whiteEngine.value;
+        const prefix = activeEngine === "nn-fusion" ? "NN CAP" : "CAP";
         return `${prefix} ${this.board.current === BLACK ? ui.blackTime.value : ui.whiteTime.value}MS`;
       }
-      return this.hintEnabled ? `${ui.nnToggle.checked ? "NN HINT" : "HINT"} 900MS` : `${prefix} -`;
+      if (this.hintEnabled) {
+        const activeEngine = this.board.current === BLACK ? ui.blackHintEngine.value : ui.whiteHintEngine.value;
+        return `${activeEngine === "nn-fusion" ? "NN HINT" : "HINT"} 900MS`;
+      }
+      return "CAP -";
     }
 
     writeLog(message) {
@@ -2342,14 +2335,9 @@
     return usesDeepLabSearch(context);
   }
 
-  function resolveEngineVersion(version) {
-    return version === LEGACY_ENGINE_VERSION ? LAB_STRONG_VERSION : version;
-  }
-
   function normalizeConfig(config = {}) {
-    const requestedVersion = resolveEngineVersion(config.version);
-    const version = ["scout", "pvs", "pvs-vcf", "v4-source-guard", LAB_STRONG_VERSION, V6_ENGINE_VERSION, "nn-fusion"].includes(requestedVersion)
-      ? requestedVersion
+    const version = ["scout", "pvs", "pvs-vcf", "v4-source-guard", LAB_STRONG_VERSION, V6_ENGINE_VERSION, "nn-fusion"].includes(config.version)
+      ? config.version
       : "pvs-vcf";
     const maxDepth = version === "scout" ? 1 : clamp(Number(config.maxDepth) || 5, 1, 10);
     const candidateLimit = clamp(Number(config.candidateLimit) || 32, 8, 64);

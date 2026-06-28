@@ -6,14 +6,14 @@
     <!-- 创造性说明：本网页为五子棋对战网页，采用了计分制的minimax和机器学习式的神经网络两种机器模型，其中neutral network可以从已有模型开始迭代，也可以学习用户的下棋风格并进行蒸馏优化。 -->
     <title>gomoku lab</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="styles.css?v=easy-train-23">
-    <script defer src="presearch-data.js?v=easy-train-23"></script>
-    <script defer src="gomoku-rules.js?v=easy-train-23"></script>
-    <script defer src="v6-engine-client.js?v=easy-train-23"></script>
-    <script defer src="script.js?v=easy-train-23"></script>
-    <script defer src="model-store.js?v=easy-train-23"></script>
-    <script defer src="trainer.js?v=easy-train-23"></script>
-    <script defer src="minimax-lab.js?v=easy-train-23"></script>
+    <link rel="stylesheet" href="styles.css?v=easy-train-24">
+    <script defer src="presearch-data.js?v=easy-train-24"></script>
+    <script defer src="gomoku-rules.js?v=easy-train-24"></script>
+    <script defer src="v6-engine-client.js?v=easy-train-24"></script>
+    <script defer src="script.js?v=easy-train-24"></script>
+    <script defer src="model-store.js?v=easy-train-24"></script>
+    <script defer src="trainer.js?v=easy-train-24"></script>
+    <script defer src="minimax-lab.js?v=easy-train-24"></script>
   </head>
   <body data-active-lab="battle">
     <main class="terminal-shell">
@@ -60,10 +60,6 @@
             <button class="mode-button" type="button" data-mode="ai-ai">机机</button>
           </div>
           <div class="toolbar-actions">
-            <label class="nn-toggle">
-              <input id="nn-toggle" type="checkbox">
-              <span>启用NN</span>
-            </label>
             <button id="hint-toggle" type="button" aria-pressed="false">提示 OFF</button>
             <button id="new-game" type="button">新局</button>
             <button id="undo-move" type="button">悔棋</button>
@@ -103,7 +99,7 @@
               <span>机器引擎</span>
               <select id="machine-engine">
                 <option value="v6-lab" selected>V6 Lab</option>
-                <option value="legacy-search">V1-V5 经典搜索</option>
+                <option value="v5-lab-strong">V5 经典搜索</option>
                 <option value="nn-fusion">NN fusion</option>
               </select>
             </label>
@@ -162,7 +158,7 @@
                 <span>版本</span>
                 <select id="black-engine">
                   <option value="v6-lab" selected>V6 Lab</option>
-                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="v5-lab-strong">V5 经典搜索</option>
                   <option value="nn-fusion">NN fusion</option>
                 </select>
               </label>
@@ -203,7 +199,7 @@
                 <span>版本</span>
                 <select id="white-engine">
                   <option value="v6-lab" selected>V6 Lab</option>
-                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="v5-lab-strong">V5 经典搜索</option>
                   <option value="nn-fusion">NN fusion</option>
                 </select>
               </label>
@@ -247,7 +243,7 @@
                 <span>版本</span>
                 <select id="black-hint-engine">
                   <option value="v6-lab" selected>V6 Lab</option>
-                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="v5-lab-strong">V5 经典搜索</option>
                   <option value="nn-fusion">NN fusion</option>
                 </select>
               </label>
@@ -268,7 +264,7 @@
                 <span>版本</span>
                 <select id="white-hint-engine">
                   <option value="v6-lab" selected>V6 Lab</option>
-                  <option value="legacy-search">V1-V5 经典搜索</option>
+                  <option value="v5-lab-strong">V5 经典搜索</option>
                   <option value="nn-fusion">NN fusion</option>
                 </select>
               </label>
@@ -683,8 +679,9 @@
         <ol>
           <li>灵感来自于对机器学习的好奇，采用五子棋平台进行实现。</li>
           <li>AI 使用说明：前端 UI 由 AI 修饰，部分迭代及蒸馏算法借助 AI 完成。</li>
-          <li>感谢施杰亨提供两张 RTX5090 训练了 5 代模型，并提供 ChatGPT 5.5 Pro 使用权。</li>
+          <li>感谢施杰亨提供两张 RTX5090 训练了 neutral network 模型，并提供 ChatGPT 5.5 Pro 使用权。</li>
           <li>V6 模型部分代码来源 <a href="https://github.com/dhbloo/rapfi" target="_blank" rel="noopener noreferrer">dhbloo/rapfi</a>。</li>
+          <li>若存在任何使用问题，请加 QQ 联系：<a href="https://qm.qq.com/q/LOeE3QzGY8" target="_blank" rel="noopener noreferrer">2590278934</a>。</li>
         </ol>
       </footer>
     </main>
